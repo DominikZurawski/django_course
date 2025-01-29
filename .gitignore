@@ -1,0 +1,51 @@
+# System specific
+*.DS_Store
+*.log
+*.pot
+*.pyc
+__pycache__/
+local_settings.py
+
+# Environments
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# Database
+db.sqlite3
+*.pgsql
+*.pgpass
+*.pgdump
+*.sql
+*.mysql
+
+# Django specific
+/staticfiles/
+/media/
+/node_modules/
+/*.sqlite3
+*.pyc
+__pycache__/
+/*.py[cod]
+*.so
+
+# VSCode specific
+.vscode/
+.history/
+
+# macOS specific
+.DS_Store
+
+# Logs
+*.log
+
+# Dependency directories
+.pip/
+node_modules/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
