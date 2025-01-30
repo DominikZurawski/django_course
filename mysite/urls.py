@@ -16,8 +16,17 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
+from rest_framework import routers
+from movies.views import MovieViewSet, ActionViewSet, ComedyViewSet
+from django.conf.urls.static import static
+from django.conf import settings
+
+router = routers.SimpleRouter()
+router.register('movies', MovieViewSet, basename='movies_router')
+router.register('action', ActionViewSet, basename='genre_router')
+router.register('comedy',ComedyViewSet, basename='movieview_router')
 
 urlpatterns = [
+    path('', include(router.urls)),
     path('admin/', admin.site.urls),
-    path('app/', include('app.urls'))
-]
+]+static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
