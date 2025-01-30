@@ -13,6 +13,5 @@ class Item(models.Model):
     item_price = models.IntegerField()
     item_image = models.CharField(max_length=500,default="https://media.licdn.com/dms/image/v2/C5122AQGeHzVmmEvW5Q/feedshare-shrink_800/feedshare-shrink_800/0/1573460295130?e=2147483647&v=beta&t=4aXjSfZb5RmDnXMAjN0Pe3I8t3A45lD-MQFp4jUKng8")
 
-    # delete this afterwards
-    # def get_absolute_url(self):
-    #        return reverse("food:detail", kwargs={"pk": self.pk})
+    def get_absolute_url(self):
+           return reverse("food:detail", kwargs={"pk": self.pk})

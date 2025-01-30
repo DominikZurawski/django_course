@@ -18,7 +18,7 @@ def index(request):
     return render(request,'food/index.html',context)
 
 class IndexClassView(ListView):
-    model = Item;
+    model = Item
     template_name ='food/index.html'
     context_object_name ='item_list'
 
@@ -49,7 +49,7 @@ def create_item(request):
 
 # this is a class based view for create item
 class CreateItem(CreateView):
-    model = Item;
+    model = Item
     fields = ['item_name','item_desc','item_price','item_image']
     template_name='food/item-form.html'
 
