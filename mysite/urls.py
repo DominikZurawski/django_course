@@ -23,8 +23,8 @@ from django.conf import settings
 
 router = routers.SimpleRouter()
 router.register('movies', MovieViewSet, basename='movies_router')
-router.register('action', ActionViewSet, basename='genre_router')
-router.register('comedy',ComedyViewSet, basename='movieview_router')
+router.register('action', ActionViewSet, basename='action_router')
+router.register('comedy',ComedyViewSet, basename='comedy_router')
 
 urlpatterns = [
     path('', include(router.urls)),
