@@ -15,6 +15,9 @@ class Products(models.Model):
 
 class Order(models.Model):
 
+    def __str__(self):
+        return self.name
+
 
     items = models.CharField(max_length=1000)
     name = models.CharField(max_length=200)
