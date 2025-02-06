@@ -14,7 +14,7 @@ venv/
 ENV/
 
 # Database
-db.sqlite3
+# db.sqlite3
 *.pgsql
 *.pgpass
 *.pgdump
@@ -25,7 +25,7 @@ db.sqlite3
 /staticfiles/
 /media/
 /node_modules/
-/*.sqlite3
+# /*.sqlite3
 *.pyc
 __pycache__/
 /*.py[cod]
