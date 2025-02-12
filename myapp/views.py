@@ -8,6 +8,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 import time
 import requests
+import logging
 
 from .models import KRSCompany
 
@@ -17,6 +18,14 @@ def scrape(request):
         phrase = request.POST.get("query")  # Fraza do wyszukania
         # Typ podmiotu: 'przedsiebiorca' lub 'stowarzyszenie'
         entity_type = request.POST.get("search_type")
+
+        logging.basicConfig(
+            filename="scraper.log",  # Ścieżka do pliku logów
+            filemode="a",  # Tryb: "a" oznacza dopisywanie, "w" oznacza nadpisywanie
+            format="%(asctime)s - %(levelname)s - %(message)s",  # Format logów
+            level=logging.INFO  # Minimalny poziom logów do zapisania (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        )
+        logging.info("The application has been launched.")
 
         # Uruchomienie scrapowania
         scrape_krs_logic(phrase, entity_type)
@@ -74,16 +83,18 @@ def scrape_krs_confirm():
 
             # Przerwij, jeśli to jest przycisk 'Wyszukaj'
             if "Wyszukaj" in text:
-                print("Znaleziono przycisk 'Wyszukaj'!")
+                print("'Wyszukaj'!")
+                logging.info("I'm looking for!")
                 break  # Zatrzymujemy pętlę, jeśli trafiliśmy na 'Wyszukaj'
 
         except Exception as e:
             print("Błąd podczas sprawdzania aktywnego elementu:", e)
+            logging.info("Error when checking the active element:", e)
             pass  # W razie błędów, przejdź do kolejnego elementu
 
     actions = ActionChains(driver)
     actions.send_keys(Keys.ENTER).perform()  # Naciśnięcie Enter
-    time.sleep(10)  # Czekamy na wyniki
+    time.sleep(14)  # Czekamy na wyniki
 
     # Sprawdzamy, czy są wyniki
     try:
@@ -93,12 +104,15 @@ def scrape_krs_confirm():
             result_count = int(result_text.split(" - ")[1])
             if result_count > 100:
                 print(f"Znaleziono {result_count} to więcej niż 100 wyników. Zawężam wyszukiwanie.")
+                logging.info(f"Found {result_count} is more than 100 results. I narrow down the search.")
                 return False
             else:
                 print(f"Znaleziono {result_count}. Przechodzimy do szczegółów.")
+                logging.info(f"Found {result_count}. Let's go into more detail.")
                 return True
         else:
             print("Nie znaleziono żadnych wyników.")
+            logging.info("No results found.")
             return False
     except Exception as e:
         return False
@@ -112,6 +126,7 @@ def scrape_krs():
 
         if not results:  # Jeśli brak wyników na stronie, kończymy
             print("Brak wyników na stronie.")
+            logging.info("No results on the website.")
             break
 
         # Przechowujemy zawartość strony, aby sprawdzić, czy się zmieniła
@@ -147,6 +162,7 @@ def scrape_krs():
 
                 else:
                     print(f"Błąd API dla {krs_number}: {response.status_code}")
+                    logging.info(f"API error for {krs_number}: {response.status_code}")
 
                 # Zapisanie danych do bazy
                 KRSCompany.objects.get_or_create(
@@ -165,13 +181,16 @@ def scrape_krs():
                 )
                 # Potwierdzenie zapisu
                 print(f"Zapisano: {name} ({krs_number})")
+                logging.info(f"Saved: {name} ({krs_number})")
 
             except Exception as e:
                 print(f"Błąd przy ekstrakcji danych: {e}")
+                logging.info(f"Data extraction error: {e}")
 
         # Sprawdzamy, czy zawartość strony zmieniła się po kliknięciu "następnej strony"
         if page_content == last_page_content:
             print("Brak zmiany wyników, zakończenie.")
+            logging.info("No change in results, termination.")
             break  # Jeśli zawartość strony się nie zmieniła, kończymy
 
         last_page_content = page_content  # Zaktualizowanie zawartości strony
@@ -192,13 +211,16 @@ def scrape_krs():
                 time.sleep(2)  # Czekamy na załadowanie wyników
             else:
                 print("Brak przycisku 'następna strona', kończymy.")
+                logging.info("No 'next page' button, we conclude.")
                 break  # Jeśli nie ma kolejnej strony, kończymy
         except TimeoutException:
             print("Czas oczekiwania na przycisk 'następna strona' minął.")
+            logging.info("The waiting time for the 'next page' button has passed.")
             break  # Jeśli czas oczekiwania minął, kończymy
 
     # Po zakończeniu zbierania wyników, możemy zwrócić dane
     print(f"Zebrano {len(krs_data)} wyników.")
+    logging.info(f"Colected {len(krs_data)} results.")
     return krs_data
 
 def krs_details(ind):
@@ -209,8 +231,33 @@ def krs_details(ind):
     actions.send_keys(Keys.ENTER).perform()
 
     print(f"Przechodzę do województwa {ind}.")
+    logging.info(f"Moving to the province {ind}.")
     actions.send_keys(Keys.DOWN * ind).perform()
     actions.send_keys(Keys.ENTER).perform()
+
+    time.sleep(0.2)
+
+    # print(f"Przechodzę do województwa {ind}.")
+    # logging.info(f"Moving to the province {ind}.")
+    # # Kliknięcie przycisku rozwijania listy
+    # dropdown_button = driver.find_element(
+    #         By.CSS_SELECTOR,
+    #         ".p-autocomplete-dropdown"
+    # )
+    # dropdown_button.click()
+
+    # listbox = WebDriverWait(driver, 2).until(
+    #         EC.presence_of_element_located((By.CSS_SELECTOR, ".p-autocomplete-items"))
+    # )
+
+    # items = listbox.find_elements(By.CSS_SELECTOR, ".p-autocomplete-item")
+
+    # adjusted_index = ind - 1
+    # if adjusted_index < 0 or adjusted_index >= len(items):
+    #     raise IndexError(f"Podany indeks {ind} jest poza zakresem dostępnych elementów (0-{len(items)-1}).")
+
+    # items[adjusted_index].click()
+
 
 def krs_details_state(inx):
 
@@ -219,9 +266,30 @@ def krs_details_state(inx):
     actions = ActionChains(driver)
     actions.send_keys(Keys.ENTER).perform()
 
+    time.sleep(0.2)
+
     print(f"Przechodzę do powiatu {inx}.")
+    logging.info(f"Moving to the district {inx}.")
     actions.send_keys(Keys.DOWN * inx).perform()
     actions.send_keys(Keys.ENTER).perform()
+
+    time.sleep(0.2)
+
+def krs_details_commune(jinx):
+
+    body = driver.find_element(By.TAG_NAME, "body")
+    body.send_keys(Keys.TAB * 3)
+    actions = ActionChains(driver)
+    actions.send_keys(Keys.ENTER).perform()
+
+    time.sleep(0.3)
+
+    print(f"Przechodzę do gminy {jinx}.")
+    logging.info(f"Moving to the commune {jinx}.")
+    actions.send_keys(Keys.DOWN * jinx).perform()
+    actions.send_keys(Keys.ENTER).perform()
+
+    time.sleep(0.3)
 
 def scrape_krs_logic(phrase, entity_type):
     options = webdriver.ChromeOptions()
@@ -235,6 +303,14 @@ def scrape_krs_logic(phrase, entity_type):
         short_entity_type = "S"
 
     try:
+        # scrape_krs_basic(phrase, entity_type)
+        # krs_details(6)
+        # krs_details_state(18)
+        # krs_details_commune(15)
+
+        # if scrape_krs_confirm():
+        #     scrape_krs()
+
         scrape_krs_basic(phrase, entity_type)
 
         if scrape_krs_confirm():
@@ -242,12 +318,12 @@ def scrape_krs_logic(phrase, entity_type):
         else:
             # index = 0
             powiat_count_dict = {
-                "DOLNOŚLĄSKIE": 30,
-                "KUJAWSKO-POMORSKIE": 21,
-                "LUBELSKIE": 24,
-                "LUBUSKIE": 14,
-                "ŁÓDZKIE": 24,
-                "MAŁOPOLSKIE": 22,
+                "DOLNOŚLĄSKIE": 0,  #30
+                "KUJAWSKO-POMORSKIE": 0, #21
+                "LUBELSKIE": 0, #24
+                "LUBUSKIE": 0, #14
+                "ŁÓDZKIE": 0, #24
+                "MAŁOPOLSKIE": 0, #22
                 "MAZOWIECKIE": 42,
                 "OPOLSKIE": 12,
                 "PODKARPACKIE": 26,
@@ -274,15 +350,27 @@ def scrape_krs_logic(phrase, entity_type):
                         driver = webdriver.Chrome(options=options)
                         scrape_krs_basic(phrase, entity_type)
                         krs_details(index + 1)
-                        krs_details_state(i+1)
+                        krs_details_state(i + 1)
 
                         if scrape_krs_confirm():
                             scrape_krs()
+                        else:
+                            for j in range(17):
+                                driver.quit()
+                                driver = webdriver.Chrome(options=options)
+                                scrape_krs_basic(phrase, entity_type)
+                                krs_details(index + 1)
+                                krs_details_state(i + 1)
+                                krs_details_commune(j + 1)
 
-        # Po zakończeniu zbierania wyników, możemy zwrócić dane
+                                if scrape_krs_confirm():
+                                    scrape_krs()
+
         print("Zbieranie zakończone.")
+        logging.info("Collection completed.")
     except Exception as e:
         print(f"Błąd: {e}")
+        logging.info(f"Error: {e}")
     finally:
         driver.quit()
 
