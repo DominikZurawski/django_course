@@ -7,6 +7,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 import time
+import requests
+
 from .models import KRSCompany
 
 
@@ -176,28 +178,27 @@ def scrape_krs_confirm():
             print("Błąd podczas sprawdzania aktywnego elementu:", e)
             pass  # W razie błędów, przejdź do kolejnego elementu
 
-    # for _ in range(counter):
-    #     body.send_keys(Keys.TAB)
-
     actions = ActionChains(driver)
     actions.send_keys(Keys.ENTER).perform()  # Naciśnięcie Enter
-    time.sleep(3)  # Czekamy na wyniki
+    time.sleep(10)  # Czekamy na wyniki
 
     # Sprawdzamy, czy są wyniki
-    result_text = driver.find_element(By.XPATH, "//ds-panel-header[contains(text(), 'Wyniki wyszukiwania')]").text
-    if "Wyniki wyszukiwania" in result_text:
-        # Odczytujemy liczbę wyników
-        result_count = int(result_text.split(" - ")[1])
-        if result_count > 100:
-            print(f"Znaleziono {result_count} to więcej niż 100 wyników. Zawężam wyszukiwanie.")
-            return False
+    try:
+        result_text = driver.find_element(By.XPATH, "//ds-panel-header[contains(text(), 'Wyniki wyszukiwania')]").text
+        if "Wyniki wyszukiwania" in result_text:
+            # Odczytujemy liczbę wyników
+            result_count = int(result_text.split(" - ")[1])
+            if result_count > 100:
+                print(f"Znaleziono {result_count} to więcej niż 100 wyników. Zawężam wyszukiwanie.")
+                return False
+            else:
+                print(f"Znaleziono {result_count}. Przechodzimy do szczegółów.")
+                return True
         else:
-            print(f"Znaleziono {result_count}. Przechodzimy do szczegółów.")
-            return True
-    else:
-        print("Nie znaleziono żadnych wyników.")
+            print("Nie znaleziono żadnych wyników.")
+            return False
+    except Exception as e:
         return False
-
 
 def scrape_krs():
     krs_data = []  # Lista do przechowywania wyników
@@ -219,10 +220,45 @@ def scrape_krs():
                 name = result.find_element(By.XPATH, ".//td[2]").text
                 krs_data.append((krs_number, name))
 
+                ## W tym miejscu zapytanie do API
+                # Zapytanie do API
+                api_url = f"https://api-krs.ms.gov.pl/api/krs/OdpisAktualny/{krs_number}?rejestr={short_entity_type}&format=json"
+                response = requests.get(api_url)
+
+                if response.status_code == 200:
+                    data = response.json()
+
+                    # Wyciąganie danych z odpowiedzi API
+                    nip = data["odpis"]["dane"]["dzial1"]["danePodmiotu"]["identyfikatory"].get("nip", None)
+                    regon = data["odpis"]["dane"]["dzial1"]["danePodmiotu"]["identyfikatory"].get("regon", None)
+                    legal_form = data["odpis"]["dane"]["dzial1"]["danePodmiotu"]["formaPrawna"]
+
+                    # Adres
+                    city = data["odpis"]["dane"]["dzial1"]["siedzibaIAdres"].get("siedziba", {}).get("miejscowosc", None)
+                    street_address = data["odpis"]["dane"]["dzial1"]["siedzibaIAdres"]["adres"].get("ulica", "") + " " + data["odpis"]["dane"]["dzial1"]["siedzibaIAdres"]["adres"].get("nrDomu", "")
+                    postal_code = data["odpis"]["dane"]["dzial1"]["siedzibaIAdres"]["adres"].get("kodPocztowy", None)
+
+                    # Email i strona
+                    website = data["odpis"]["dane"]["dzial1"]["siedzibaIAdres"].get("adresStronyInternetowej", None)
+                    email = data["odpis"]["dane"]["dzial1"]["siedzibaIAdres"].get("adresPocztyElektronicznej", None)
+
+                else:
+                    print(f"Błąd API dla {krs_number}: {response.status_code}")
+
                 # Zapisanie danych do bazy
                 KRSCompany.objects.get_or_create(
                     krs_number=krs_number,
-                    defaults={'name': name}
+                    defaults={
+                        'name': name,
+                        'nip': nip,
+                        'regon': regon,
+                        'legal_form': legal_form,
+                        'city': city,
+                        'street_address': street_address,
+                        'postal_code': postal_code,
+                        'website': website,
+                        'email': email
+                    }
                 )
                 # Potwierdzenie zapisu
                 print(f"Zapisano: {name} ({krs_number})")
@@ -265,11 +301,10 @@ def scrape_krs():
 def krs_details(ind):
 
     body = driver.find_element(By.TAG_NAME, "body")
-    body.send_keys(Keys.TAB)
-    body.send_keys(Keys.TAB)
+    body.send_keys(Keys.TAB * 2)
     actions = ActionChains(driver)
     actions.send_keys(Keys.ENTER).perform()
-    # for i in range(ind):
+
     print(f"Przechodzę do województwa {ind}.")
     actions.send_keys(Keys.DOWN * ind).perform()
     actions.send_keys(Keys.ENTER).perform()
@@ -277,13 +312,10 @@ def krs_details(ind):
 def krs_details_state(inx):
 
     body = driver.find_element(By.TAG_NAME, "body")
-    body.send_keys(Keys.TAB)
-    body.send_keys(Keys.TAB)
-    body.send_keys(Keys.TAB)
+    body.send_keys(Keys.TAB * 3)
     actions = ActionChains(driver)
     actions.send_keys(Keys.ENTER).perform()
 
-    # for i in range(inx):
     print(f"Przechodzę do powiatu {inx}.")
     actions.send_keys(Keys.DOWN * inx).perform()
     actions.send_keys(Keys.ENTER).perform()
@@ -293,6 +325,11 @@ def scrape_krs_logic(phrase, entity_type):
     # options.add_argument("--headless")  # Tryb bez interfejsu
     global driver
     driver = webdriver.Chrome(options=options)
+    global short_entity_type
+    if entity_type == "przedsiebiorca":
+        short_entity_type = "P"
+    else:
+        short_entity_type = "S"
 
     try:
         scrape_krs_basic(phrase, entity_type)
@@ -300,7 +337,7 @@ def scrape_krs_logic(phrase, entity_type):
         if scrape_krs_confirm():
             scrape_krs()
         else:
-            index = 0
+            # index = 0
             powiat_count_dict = {
                 "DOLNOŚLĄSKIE": 30,
                 "KUJAWSKO-POMORSKIE": 21,
@@ -320,50 +357,20 @@ def scrape_krs_logic(phrase, entity_type):
                 "ZACHODNIOPOMORSKIE": 16
             }
 
-            # while index <= 16:
-            for index, (wojewodztwo, liczba_powiatow) in powiat_count_dict.items():
+            for index, (wojewodztwo, liczba_powiatow) in enumerate(powiat_count_dict.items()):
                 driver.quit()
                 driver = webdriver.Chrome(options=options)
                 scrape_krs_basic(phrase, entity_type)
-                # index += 1
-                print("index: ", index)
                 krs_details(index + 1)
 
                 if scrape_krs_confirm():
                     scrape_krs()
                 else:
-                    # powiat_count_list = [
-                    #     30,  # DOLNOŚLĄSKIE
-                    #     21,  # KUJAWSKO-POMORSKIE
-                    #     24,  # LUBELSKIE
-                    #     14,  # LUBUSKIE
-                    #     24,  # ŁÓDZKIE
-                    #     22,  # MAŁOPOLSKIE
-                    #     42,  # MAZOWIECKIE
-                    #     12,  # OPOLSKIE
-                    #     26,  # PODKARPACKIE
-                    #     17,  # PODLASKIE
-                    #     22,  # POMORSKIE
-                    #     19,  # ŚLĄSKIE
-                    #     14,  # ŚWIĘTOKRZYSKIE
-                    #     21,  # WARMIŃSKO-MAZURSKIE
-                    #     35,  # WIELKOPOLSKIE
-                    #     16   # ZACHODNIOPOMORSKIE
-                    # ]
-
-                    # j = index - 1
-                    # powiat_count = powiat_count_list[j]  # Liczba dostępnych powiatów dla danego województwa
-
-                    # index_state = 0
-
-                    # while index_state <= powiat_count:
                     for i in range(liczba_powiatow):
-                        print(i)
                         driver.quit()
                         driver = webdriver.Chrome(options=options)
                         scrape_krs_basic(phrase, entity_type)
-                        krs_details(index)
-                        # index_state += 1
+                        krs_details(index + 1)
                         krs_details_state(i+1)
 
                         if scrape_krs_confirm():
