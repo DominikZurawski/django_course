@@ -13,14 +13,6 @@ env/
 venv/
 ENV/
 
-# Database
-db.sqlite3
-*.pgsql
-*.pgpass
-*.pgdump
-*.sql
-*.mysql
-
 # Django specific
 /staticfiles/
 /media/
